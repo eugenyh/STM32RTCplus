@@ -43,7 +43,6 @@ private:
   void _daysToDate(uint32_t days, uint16_t &y, uint8_t &m, uint8_t &d);
   bool _isLeapYear(uint16_t y);
   int32_t _getTimezoneOffset(uint16_t y, uint8_t m, uint8_t d, uint8_t h);
-  uint32_t _readRTC();
   void _writeRefDate(uint16_t y, uint8_t m, uint8_t d);
   bool _readRefDate(uint16_t &y, uint8_t &m, uint8_t &d);
 };

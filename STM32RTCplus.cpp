@@ -28,7 +28,7 @@ bool STM32RTCplus::getTime(struct tm &tm) {
   if (!_readRefDate(ry, rmo, rd)) return false;
 
   uint32_t refDays = _dateToDays(ry, rmo, rd);
-  uint32_t rtcSec = _readRTC();
+  uint32_t rtcSec = _rtc.getSeconds();
   uint32_t utcSec = refDays * 86400UL + rtcSec;
 
   uint32_t localSec = utcSec;
@@ -113,7 +113,7 @@ bool STM32RTCplus::_ntpSync(UDP &udp, bool connected, const char* server, int ti
 // === Коррекция времени ===
 bool STM32RTCplus::adjustSeconds(int32_t seconds) {
   // Читаем текущее значение RTC-счётчика
-  uint32_t current = _readRTC();
+  uint32_t current = _rtc.getSeconds();
 
   // Применяем поправку
   int64_t newSec = (int64_t)current + seconds;
@@ -193,12 +193,6 @@ int32_t STM32RTCplus::_getTimezoneOffset(uint16_t y, uint8_t m, uint8_t d, uint8
     return -4 * 3600;
   }
   return 0;
-}
-
-uint32_t STM32RTCplus::_readRTC() {
-  uint32_t s;
-  do { s = _rtc.getSeconds(); } while (_rtc.getSeconds() != s);
-  return s;
 }
 
 void STM32RTCplus::_writeRefDate(uint16_t y, uint8_t m, uint8_t d) {
