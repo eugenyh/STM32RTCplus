@@ -124,5 +124,5 @@ This effectively provides **64-bit precision**, with overflow only after ~136 ye
 
 ## 🧾 License
 
-MIT License © 2025 Eugeny Ho  
+MIT License © 2025 EugenyH  
 [GitHub: eugenyh/STM32RTCplus](https://github.com/eugenyh/STM32RTCplus)
