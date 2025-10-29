@@ -61,7 +61,7 @@ STM32RTCplus rtc;
 
 | Code | Description |
 |------|--------------|
-| `"UTC"` | Universal Coordinated Time (UTC+0) |
+| `"UTC"` | Universal Coordinated Time (UTC+0), including UTC+N or UTC-N |
 | `"MSK-3"` | Moscow (UTC+3) |
 | `"CET-1"` | Central Europe (UTC+1) |
 | `"EST5EDT"` | Eastern US (auto DST) |
