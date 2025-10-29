@@ -112,25 +112,24 @@ bool STM32RTCplus::_ntpSync(UDP &udp, bool connected, const char* server, int ti
 
 // === Коррекция времени ===
 bool STM32RTCplus::adjustSeconds(int32_t seconds) {
-  struct tm t;
-  if (!getTime(t)) return false;
+  // Читаем текущее значение RTC-счётчика
+  uint32_t current = _readRTC();
 
-  uint32_t days = _dateToDays(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
-  uint32_t secsInDay = t.tm_hour * 3600 + t.tm_min * 60 + t.tm_sec;
+  // Применяем поправку
+  int64_t newSec = (int64_t)current + seconds;
 
-  int64_t total = (int64_t)days * 86400 + secsInDay + seconds;
-  if (total < 0) return false;
+  // Защита от переполнения
+  if (newSec < 0) {
+    newSec = 0;
+  }
+  if (newSec > 0xFFFFFFFFUL) {
+    newSec = 0xFFFFFFFFUL;
+  }
 
-  uint32_t newDays = total / 86400;
-  uint32_t newSecs = total % 86400;
+  // Записываем обратно в RTC — БЕЗ BKP!
+  _rtc.setSeconds((uint32_t)newSec);
 
-  uint16_t y, mo, d;
-  _daysToDate(newDays, y, mo, d);
-
-  return setTime(y, mo, d,
-                 newSecs / 3600,
-                 (newSecs % 3600) / 60,
-                 newSecs % 60);
+  return true;
 }
 
 // === Вспомогательные функции (без изменений) ===

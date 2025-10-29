@@ -99,6 +99,32 @@ On startup:
 - Accuracy depends on 32.768 kHz crystal
 
 ---
+## Safe Usage of `syncNTP()` — Protect Your Backup Registers
+
+The STM32F103's **BKP registers** have **~10,000 write cycles**.
+
+## `syncNTP()` and `adjustSeconds()`
+
+| Method | Writes to BKP? | Safe Frequency |
+|-------|----------------|----------------|
+| `syncNTP()` | Yes | **Once per day** |
+| `adjustSeconds()` | No | **Unlimited** (every second if needed) |
+
+### Best Practice
+
+```cpp
+// Full sync: once per day
+if (rtc.isFirstBoot() || dailySync) {
+  rtc.syncNTP(udp, isConnected);  // Writes BKP
+}
+
+// Drift correction: every hour
+if (hourPassed) {
+  rtc.adjustSeconds(+1);  // NO BKP wear
+}
+
+---
+
 
 ## ⚙️ Platform Support
 
