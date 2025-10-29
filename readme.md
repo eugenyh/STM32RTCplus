@@ -53,6 +53,7 @@ STM32RTCplus rtc;
 | `bool getTime(struct tm &tm)` | Gets current local time |
 | `bool syncNTP(const char* server = "pool.ntp.org", uint16_t timeout = 5000)` | Performs one-time NTP synchronization |
 | `bool isFirstBoot()` | Returns true if RTC backup area was empty (first initialization) |
+| `bool adjustSeconds(int32_t seconds) ` | Returns true if time was adjusted (+ or - in sec) |
 
 ---
 
