@@ -1,12 +1,12 @@
 # STM32RTCplus
 
 ## Overview  
-**STM32RTCplus** is an enhanced real-time clock (RTC) library for the **STM32F1** family (e.g. STM32F103).  
+**STM32RTCplus** is an enhanced real-time clock (RTC) library for the **STM32F1** family (e.g. STM32F103) designed for **Arduino IDE (STM32Duino core)**.  
 It extends the functionality of the built-in RTC peripheral by adding:
 - **Full calendar support** (date + time) even when running only from a backup battery.
 - **Year 2038 fix** (avoids 32-bit Unix timestamp overflow).
 - **Optional NTP synchronization** for accurate network time updates.
-- Designed for **HAL** or **LL**-based projects with minimal overhead.
+- Lightweight and resource-efficient, ideal for embedded Arduino projects.
 
 ---
 
@@ -15,8 +15,8 @@ It extends the functionality of the built-in RTC peripheral by adding:
 ✅ Persistent calendar in backup domain (works even after main power loss)  
 ✅ 64-bit timestamp logic – safe beyond the year 2038  
 ✅ Optional NTP synchronization over Ethernet or WiFi  
-✅ Lightweight, dependency-free, and easy to integrate  
-✅ Compatible with STM32 HAL and LL drivers  
+✅ Lightweight and dependency-free  
+✅ Designed for **Arduino IDE (STM32Duino core)**  
 
 ---
 
@@ -47,20 +47,20 @@ You can define sync intervals (in minutes) or trigger manual NTP updates.
 
 ## Installation  
 
-### Option 1 — Clone into your project  
+### Option 1 — Clone into your Arduino libraries folder  
 ```bash
-git clone https://github.com/eugenyh/STM32RTCplus.git
+git clone https://github.com/eugenyh/STM32RTCplus.git ~/Documents/Arduino/libraries/STM32RTCplus
 ```
 
-### Option 2 — Add as a PlatformIO library  
-Add this line into your `platformio.ini`:
-```ini
-lib_deps = https://github.com/eugenyh/STM32RTCplus.git
-```
+### Option 2 — Add as ZIP Library in Arduino IDE  
+1. Download the latest release as a `.zip` file from GitHub.  
+2. In Arduino IDE, go to **Sketch → Include Library → Add .ZIP Library...**  
+3. Select the downloaded file.  
 
 Then include it:
 ```cpp
-#include "STM32RTCplus.h"
+#include <STM32RTCplus.h>
+
 STM32RTCplus rtc;
 ```
 
@@ -69,11 +69,12 @@ STM32RTCplus rtc;
 ## Usage Example  
 
 ```cpp
-#include "STM32RTCplus.h"
+#include <STM32RTCplus.h>
 
 STM32RTCplus rtc;
 
 void setup() {
+    Serial.begin(115200);
     rtc.begin();
     rtc.setDateTime(2025, 10, 29, 12, 0, 0);     // Set initial time
     rtc.enableNTP("pool.ntp.org", 60);           // Sync every 60 minutes
@@ -114,7 +115,7 @@ void loop() {
 | Item | Supported |
 |------|------------|
 | **MCU** | STM32F103 / STM32F1 series |
-| **Frameworks** | STM32CubeIDE, HAL, LL, PlatformIO |
+| **Frameworks** | **Arduino IDE (STM32Duino core)** |
 | **Networking** | Any module providing UDP (e.g. Ethernet, ESP8266, W5500, etc.) |
 | **Memory footprint** | Very low (~2 KB Flash, <100 B RAM) |
 
@@ -124,7 +125,7 @@ void loop() {
 
 ```text
  ┌──────────────────────────────┐
- │        Application Code      │
+ │        User Sketch (INO)     │
  └──────────────┬───────────────┘
                 │
                 ▼
@@ -137,7 +138,7 @@ void loop() {
                 │
                 ▼
  ┌──────────────────────────────┐
- │     STM32 HAL / LL RTC       │
+ │     STM32Duino RTC HAL       │
  │  - Hardware 32-bit counter   │
  │  - Backup domain registers   │
  └──────────────────────────────┘
@@ -152,5 +153,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 ## Author  
-Developed by **EugenyH** ([GitHub: eugenyh](https://github.com/eugenyh))  
+Developed by **Eugeny** ([GitHub: eugenyh](https://github.com/eugenyh))  
 Contributions, improvements, and pull requests are welcome!
