@@ -4,8 +4,7 @@
 #include <Arduino.h>
 #include <STM32RTC.h>
 #include <FlashStorage.h>
-#include <WiFi.h>
-#include <WiFiUdp.h>
+#include <UDP.h>  // Универсальный UDP
 
 class STM32RTCplus {
 public:
@@ -15,8 +14,15 @@ public:
   bool setTime(uint16_t year, uint8_t month, uint8_t day,
                uint8_t hour = 0, uint8_t minute = 0, uint8_t second = 0);
   bool getTime(struct tm &tm);
-  bool syncNTP(const char* server = "pool.ntp.org", int timeout = 5000);
+  
+  // Универсальная NTP синхронизация
+  bool syncNTP(UDP &udp, 
+               bool (*isConnected)() = nullptr,
+               const char* server = "pool.ntp.org", 
+               int timeoutMs = 5000);
+  
   bool isFirstBoot();
+  bool adjustSeconds(int32_t seconds);  // Добавлен метод коррекции
 
 private:
   STM32RTC& _rtc = STM32RTC::getInstance();
@@ -29,10 +35,10 @@ private:
   static const uint16_t MAGIC1 = 0xA5A5;
   static const uint16_t MAGIC2 = 0x5A5A;
 
-  WiFiUDP _udp;
-  static const int NTP_PACKET_SIZE = 48;
-  byte _packet[NTP_PACKET_SIZE];
+  // NTP
+  bool _ntpSync(UDP &udp, bool connected, const char* server, int timeoutMs);
 
+  // Вспомогательные
   uint32_t _dateToDays(uint16_t y, uint8_t m, uint8_t d);
   void _daysToDate(uint32_t days, uint16_t &y, uint8_t &m, uint8_t &d);
   bool _isLeapYear(uint16_t y);
@@ -40,8 +46,6 @@ private:
   uint32_t _readRTC();
   void _writeRefDate(uint16_t y, uint8_t m, uint8_t d);
   bool _readRefDate(uint16_t &y, uint8_t &m, uint8_t &d);
-  void _sendNTP(const char* addr);
-  bool _recvNTP(uint32_t &epoch);
 };
 
 #endif
