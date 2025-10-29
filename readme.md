@@ -1,7 +1,8 @@
 # 🕒 STM32RTCplus
 
-**Advanced RTC library for STM32F103 (Arduino core)**  
-Adds full date/calendar support, safe time storage across power loss, and one-time NTP synchronization.
+## Overview  
+**STM32RTCplus** is an enhanced real-time clock (RTC) library for the **STM32F1** family (e.g. STM32F103) designed for **Arduino IDE (STM32Duino core)**.  
+It extends the functionality of the built-in RTC peripheral.
 
 ---
 
@@ -16,6 +17,26 @@ Adds full date/calendar support, safe time storage across power loss, and one-ti
 
 ---
 
+## Installation  
+
+### Option 1 — Clone into your Arduino libraries folder  
+```bash
+git clone https://github.com/eugenyh/STM32RTCplus.git ~/Documents/Arduino/libraries/STM32RTCplus
+```
+
+### Option 2 — Add as ZIP Library in Arduino IDE  
+1. Download the latest release as a `.zip` file from GitHub.  
+2. In Arduino IDE, go to **Sketch → Include Library → Add .ZIP Library...**  
+3. Select the downloaded file.  
+
+Then include it:
+```cpp
+#include <STM32RTCplus.h>
+
+STM32RTCplus rtc;
+```
+
+---
 ## 🚀 Usage Example
 
 ```cpp
@@ -95,22 +116,33 @@ void loop() {
 
 ## 🧠 How It Works
 
-STM32F103 has a hardware RTC, but it only keeps **seconds** — not the full date — while running from backup battery.  
-`STM32RTCplus` solves this by:
+### 1. Hardware RTC Limitation
+The STM32F1 RTC provides only a **32-bit seconds counter**, but **no calendar**.  
+When powered by VBAT, it keeps counting — but **loses the date context**.
 
-- Storing **base date** (year, month, day) in **backup registers**
-- Counting **seconds since base date** in the RTC counter  
-→ Together, this acts like a **64-bit extended timestamp**, safe far beyond 2038.
+### 2. Reference Date + Counter = Full Time
+`STM32RTCplus` stores:
+- A **reference date** (year, month, day) in **RTC backup registers**
+- The **RTC counter** holds seconds since that date
 
----
+On startup:  
+`Current time = reference date + RTC seconds`
 
-## 🛡 Y2038-Safe Design
+→ Works even after months on battery.
 
-Instead of using 32-bit `time_t`, the library combines:
-- **Reference date** stored in backup registers  
-- **RTC seconds counter**  
+### 3. Y2038-Safe (No 32-bit Unix Time)
+- No `time_t`, no overflow in 2038
+- Effective **64-bit precision**
+- Overflow only after **~136 years**
 
-This effectively provides **64-bit precision**, with overflow only after ~136 years of continuous operation.
+### 4. NTP Synchronization
+- `syncNTP()` fetches time from an NTP server
+- Sets **new reference date** and **resets RTC counter**
+- One-time operation (no intervals)
+
+### 5. No Drift Correction
+- No automatic crystal drift compensation
+- Accuracy depends on 32.768 kHz crystal
 
 ---
 
