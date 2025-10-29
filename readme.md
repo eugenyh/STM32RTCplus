@@ -1,157 +1,128 @@
-# STM32RTCplus
+# 🕒 STM32RTCplus
 
-## Overview  
-**STM32RTCplus** is an enhanced real-time clock (RTC) library for the **STM32F1** family (e.g. STM32F103) designed for **Arduino IDE (STM32Duino core)**.  
-It extends the functionality of the built-in RTC peripheral by adding:
-- **Full calendar support** (date + time) even when running only from a backup battery.
-- **Year 2038 fix** (avoids 32-bit Unix timestamp overflow).
-- **Optional NTP synchronization** for accurate network time updates.
-- Lightweight and resource-efficient, ideal for embedded Arduino projects.
+**Advanced RTC library for STM32F103 (Arduino core)**  
+Adds full date/calendar support, safe time storage across power loss, and one-time NTP synchronization.
 
 ---
 
-## Key Features  
-✅ Full date & time tracking (Year, Month, Day, Hour, Minute, Second)  
-✅ Persistent calendar in backup domain (works even after main power loss)  
-✅ 64-bit timestamp logic – safe beyond the year 2038  
-✅ Optional NTP synchronization over Ethernet or WiFi  
-✅ Lightweight and dependency-free  
-✅ Designed for **Arduino IDE (STM32Duino core)**  
+## ✨ Features
+
+- 🗓 Full date & time support (not only time counter)
+- 🔋 Keeps both date and time while powered only by backup battery
+- 🌐 One-time NTP synchronization
+- 🕰 Y2038-safe timekeeping (no overflow in 2038)
+- 🌍 Time zone support
+- 💡 Arduino IDE compatible (no HAL or LL dependency)
 
 ---
 
-## How It Works  
-
-### 1. Hardware RTC integration  
-The STM32F1 built-in RTC hardware provides only a **time counter** (seconds since last set) but **does not store calendar date** when powered by the backup battery alone.  
-This library solves that limitation by maintaining a **software calendar layer** that translates the hardware tick counter into a full calendar date.
-
-### 2. Persistent backup domain handling  
-- When VBat is present, the hardware RTC continues to count seconds.  
-- The library periodically saves **epoch offsets and date context** into RTC backup registers.  
-- On startup, it reconstructs the full date/time from that stored context, even after long power losses.
-
-### 3. 2038 problem (Unix timestamp overflow)  
-Standard Unix time is a signed 32-bit integer (`time_t`), which overflows on **January 19, 2038**.  
-`STM32RTCplus` internally uses **64-bit timestamps (uint64_t)**, ensuring correct operation for centuries ahead.
-
-### 4. NTP Synchronization (optional)  
-The library supports synchronization with an external **NTP server** over UDP.  
-After network time is obtained, it adjusts the RTC and updates the backup domain accordingly.
-
-### 5. Time drift correction  
-Each synchronization recalculates offset and corrects for crystal drift automatically.  
-You can define sync intervals (in minutes) or trigger manual NTP updates.
-
----
-
-## Installation  
-
-### Option 1 — Clone into your Arduino libraries folder  
-```bash
-git clone https://github.com/eugenyh/STM32RTCplus.git ~/Documents/Arduino/libraries/STM32RTCplus
-```
-
-### Option 2 — Add as ZIP Library in Arduino IDE  
-1. Download the latest release as a `.zip` file from GitHub.  
-2. In Arduino IDE, go to **Sketch → Include Library → Add .ZIP Library...**  
-3. Select the downloaded file.  
-
-Then include it:
-```cpp
-#include <STM32RTCplus.h>
-
-STM32RTCplus rtc;
-```
-
----
-
-## Usage Example  
+## 🚀 Usage Example
 
 ```cpp
 #include <STM32RTCplus.h>
+#include <WiFi.h>
 
-STM32RTCplus rtc;
+const char* ssid = "MyWiFi";
+const char* pass = "12345678";
+
+STM32RTCplus rtc("MSK-3");  // Moscow timezone (UTC+3)
 
 void setup() {
-    Serial.begin(115200);
-    rtc.begin();
-    rtc.setDateTime(2025, 10, 29, 12, 0, 0);     // Set initial time
-    rtc.enableNTP("pool.ntp.org", 60);           // Sync every 60 minutes
+  Serial.begin(115200);
+
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected");
+
+  rtc.begin();
+
+  if (rtc.isFirstBoot()) {
+    Serial.println("First boot — syncing with NTP...");
+    if (rtc.syncNTP()) {
+      Serial.println("NTP sync successful");
+    } else {
+      Serial.println("NTP sync failed");
+    }
+  } else {
+    Serial.println("RTC restored from backup");
+  }
 }
 
 void loop() {
-    DateTime now = rtc.getDateTime();
+  static uint32_t last = 0;
+  if (millis() - last >= 1000) {
+    last = millis();
 
-    Serial.print(now.year()); Serial.print("-");
-    Serial.print(now.month()); Serial.print("-");
-    Serial.print(now.day()); Serial.print(" ");
-    Serial.print(now.hour()); Serial.print(":");
-    Serial.print(now.minute()); Serial.print(":");
-    Serial.println(now.second());
-
-    delay(1000);
+    struct tm t;
+    if (rtc.getTime(t)) {
+      Serial.printf("%04d-%02d-%02d %02d:%02d:%02d %s\n",
+        t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
+        t.tm_hour, t.tm_min, t.tm_sec,
+        t.tm_isdst ? "(DST)" : "");
+    }
+  }
 }
 ```
 
 ---
 
-## Public API Reference  
+## 🧩 Public API Reference
 
 | Method | Description |
 |--------|--------------|
-| `void begin()` | Initializes RTC hardware and loads backup data. |
-| `void setDateTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second)` | Sets calendar date/time. |
-| `DateTime getDateTime()` | Returns the current date/time. |
-| `void enableNTP(const char* server, uint16_t intervalMin)` | Enables NTP sync with specified interval. |
-| `void syncNow()` | Manually triggers immediate NTP synchronization. |
-| `uint64_t getUnixTime64()` | Returns current time in 64-bit Unix timestamp. |
-| `bool isValid()` | Checks RTC validity (whether initialized and running). |
+| `STM32RTCplus(const char* timezone = "UTC")` | Constructor with timezone (e.g., `"MSK-3"`, `"CET-1"`) |
+| `void begin()` | Initializes RTC and loads state from backup registers |
+| `bool setTime(int year, int month, int day, int hour = 0, int min = 0, int sec = 0)` | Sets current time and date (UTC) |
+| `bool getTime(struct tm &tm)` | Gets current local time |
+| `bool syncNTP(const char* server = "pool.ntp.org", uint16_t timeout = 5000)` | Performs one-time NTP synchronization |
+| `bool isFirstBoot()` | Returns true if RTC backup area was empty (first initialization) |
 
 ---
 
-## Compatibility  
+## 🌍 Supported Timezones
 
-| Item | Supported |
-|------|------------|
-| **MCU** | STM32F103 / STM32F1 series |
-| **Frameworks** | **Arduino IDE (STM32Duino core)** |
-| **Networking** | Any module providing UDP (e.g. Ethernet, ESP8266, W5500, etc.) |
-| **Memory footprint** | Very low (~2 KB Flash, <100 B RAM) |
-
----
-
-## Internal Architecture  
-
-```text
- ┌──────────────────────────────┐
- │        User Sketch (INO)     │
- └──────────────┬───────────────┘
-                │
-                ▼
- ┌──────────────────────────────┐
- │       STM32RTCplus API       │
- │  - Calendar emulation        │
- │  - NTP synchronization       │
- │  - Drift compensation        │
- └──────────────┬───────────────┘
-                │
-                ▼
- ┌──────────────────────────────┐
- │     STM32Duino RTC HAL       │
- │  - Hardware 32-bit counter   │
- │  - Backup domain registers   │
- └──────────────────────────────┘
-```
+| Code | Description |
+|------|--------------|
+| `"UTC"` | Universal Coordinated Time (UTC+0) |
+| `"MSK-3"` | Moscow (UTC+3) |
+| `"CET-1"` | Central Europe (UTC+1) |
+| `"EST5EDT"` | Eastern US (auto DST) |
 
 ---
 
-## License  
-Released under the **MIT License**.  
-See [LICENSE](LICENSE) for details.
+## 🧠 How It Works
+
+STM32F103 has a hardware RTC, but it only keeps **seconds** — not the full date — while running from backup battery.  
+`STM32RTCplus` solves this by:
+
+- Storing **base date** (year, month, day) in **backup registers**
+- Counting **seconds since base date** in the RTC counter  
+→ Together, this acts like a **64-bit extended timestamp**, safe far beyond 2038.
 
 ---
 
-## Author  
-Developed by **Eugeny** ([GitHub: eugenyh](https://github.com/eugenyh))  
-Contributions, improvements, and pull requests are welcome!
+## 🛡 Y2038-Safe Design
+
+Instead of using 32-bit `time_t`, the library combines:
+- **Reference date** stored in backup registers  
+- **RTC seconds counter**  
+
+This effectively provides **64-bit precision**, with overflow only after ~136 years of continuous operation.
+
+---
+
+## ⚙️ Platform Support
+
+- STM32F103C8 / STM32F103CB (“Blue Pill”, “Black Pill”)  
+- Arduino IDE (STM32 core by ST or Roger Clark)  
+- WiFi for NTP (ESP8266/ESP32 modules or Ethernet shield)
+
+---
+
+## 🧾 License
+
+MIT License © 2025 Eugeny Ho  
+[GitHub: eugenyh/STM32RTCplus](https://github.com/eugenyh/STM32RTCplus)
