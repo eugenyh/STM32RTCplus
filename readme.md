@@ -39,7 +39,7 @@ STM32RTCplus rtc;
 ---
 ## 🚀 Usage Example
 
-[For Wifi and Ethernet: STM32RTCplus\examples\BasicUsage](https://github.com/eugenyh/STM32RTCplus/examples/BasicUsage)
+[For Wifi and Ethernet: STM32RTCplus\examples\BasicUsage](https://github.com/eugenyh/STM32RTCplus/tree/main/examples/BasicUsage)
 
 ---
 
