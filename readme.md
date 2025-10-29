@@ -1,8 +1,7 @@
 # 🕒 STM32RTCplus
 
 ## Overview  
-**STM32RTCplus** is an enhanced real-time clock (RTC) library for the **STM32F1** family (e.g. STM32F103) designed for **Arduino IDE (STM32Duino core)**.  
-It extends the functionality of the built-in RTC peripheral.
+**STM32RTCplus** is an enhanced real-time clock (RTC) library for the **STM32F1** family (e.g. STM32F103) designed for **Arduino IDE (STM32Duino core)**. It extends the functionality of the built-in RTC peripheral.
 
 ---
 
@@ -71,8 +70,7 @@ STM32RTCplus rtc;
 ## 🧠 How It Works
 
 ### 1. Hardware RTC Limitation
-The STM32F1 RTC provides only a **32-bit seconds counter**, but **no calendar**.  
-When powered by VBAT, it keeps counting — but **loses the date context**.
+The STM32F1 RTC provides only a **32-bit seconds counter**, but **no calendar**. When powered by VBAT, it keeps counting — but **loses the date context**.
 
 ### 2. Reference Date + Counter = Full Time
 `STM32RTCplus` stores:
