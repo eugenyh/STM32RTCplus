@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <STM32RTC.h>
 #include <FlashStorage.h>
-#include <UDP.h>  // Универсальный UDP
+#include <UDP.h>
 
 class STM32RTCplus {
 public:
@@ -15,14 +15,13 @@ public:
                uint8_t hour = 0, uint8_t minute = 0, uint8_t second = 0);
   bool getTime(struct tm &tm);
   
-  // Универсальная NTP синхронизация
   bool syncNTP(UDP &udp, 
                bool (*isConnected)() = nullptr,
                const char* server = "pool.ntp.org", 
                int timeoutMs = 5000);
   
   bool isFirstBoot();
-  bool adjustSeconds(int32_t seconds);  // Добавлен метод коррекции
+  bool adjustSeconds(int32_t seconds);
 
 private:
   STM32RTC& _rtc = STM32RTC::getInstance();
@@ -34,6 +33,9 @@ private:
 
   static const uint16_t MAGIC1 = 0xA5A5;
   static const uint16_t MAGIC2 = 0x5A5A;
+
+  // Новая приватная функция
+  void _waitForLastTask(); 
 
   // NTP
   bool _ntpSync(UDP &udp, bool connected, const char* server, int timeoutMs);
