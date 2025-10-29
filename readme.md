@@ -122,6 +122,7 @@ if (rtc.isFirstBoot() || dailySync) {
 if (hourPassed) {
   rtc.adjustSeconds(+1);  // NO BKP wear
 }
+```
 
 ---
 
