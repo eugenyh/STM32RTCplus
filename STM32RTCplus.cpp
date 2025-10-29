@@ -17,22 +17,26 @@ bool STM32RTCplus::isFirstBoot() {
 
 bool STM32RTCplus::setTime(uint16_t y, uint8_t mo, uint8_t d,
                            uint8_t h, uint8_t mi, uint8_t s) {
+  // Диапазоны
   if (y < 1970 || mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+  if (h > 23 || mi > 59 || s > 59) return false;
 
-  // 1. Сначала сохраняем опорную дату во Flash
+  // Валидность даты
+  const uint8_t daysInMonth[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+  uint8_t maxDays = daysInMonth[mo];
+  if (mo == 2 && _isLeapYear(y)) maxDays = 29;
+  if (d > maxDays) return false;
+
   _writeRefDate(y, mo, d);
-
-  // 2. Вычисляем секунды *текущего дня*
   uint32_t daySec = h * 3600UL + mi * 60UL + s;
 
-  // 3. Устанавливаем счетчик RTC в это значение (с защитой от записи)
   _waitForLastTask();
-  RTC->CRL |= RTC_CRL_CNF;  // Войти в режим конфигурации
+  RTC->CRL |= RTC_CRL_CNF;
   RTC->CNTH = daySec >> 16;
   RTC->CNTL = daySec & 0xFFFF;
-  RTC->CRL &= ~RTC_CRL_CNF; // Выйти из режима
+  RTC->CRL &= ~RTC_CRL_CNF;
   _waitForLastTask();
-  
+
   return true;
 }
 
@@ -41,29 +45,37 @@ bool STM32RTCplus::getTime(struct tm &tm) {
   if (!_readRefDate(ry, rmo, rd)) return false;
 
   uint32_t refDays = _dateToDays(ry, rmo, rd);
-  uint32_t rtcSec = (RTC->CNTH << 16) | RTC->CNTL; // Читаем напрямую
+  uint32_t rtcSec = (RTC->CNTH << 16) | RTC->CNTL;
   uint64_t utcSec = (uint64_t)refDays * 86400ULL + rtcSec;
 
-  // ... (весь ваш код для часовых поясов, он без изменений) ...
-  uint32_t localSec = utcSec;
+  uint64_t localSec = utcSec;
   uint16_t y = 1970; uint8_t mo = 1, d = 1, h = 0;
   int32_t offset = 0;
 
-  uint32_t finalDays = localSec / 86400UL;
-  uint32_t finalSecs = localSec % 86400UL;
+  // 3 итерации для стабилизации DST
+  for (int i = 0; i < 3; i++) {
+    uint64_t days = localSec / 86400ULL;
+    uint32_t secs = localSec % 86400ULL;
+    _daysToDate(days, y, mo, d);
+    h = secs / 3600;
+    offset = _getTimezoneOffset(y, mo, d, h);
+    localSec = utcSec + offset;
+  }
+
+  // Финальный расчёт
+  uint64_t finalDays = localSec / 86400ULL;
+  uint32_t finalSecs = localSec % 86400ULL;
   _daysToDate(finalDays, y, mo, d);
 
   tm.tm_year = y - 1900;
   tm.tm_mon  = mo - 1;
   tm.tm_mday = d;
-  tm.tm_hour = secs / 3600;
-  tm.tm_min  = (secs % 3600) / 60;
-  tm.tm_sec  = secs % 60;
-  tm.tm_wday = (days + 4) % 7;
-  // Небольшое исправление для tm_isdst
-  int32_t currentOffset = _getTimezoneOffset(y, mo, d, tm.tm_hour);
+  tm.tm_hour = finalSecs / 3600;
+  tm.tm_min  = (finalSecs % 3600) / 60;
+  tm.tm_sec  = finalSecs % 60;
+  tm.tm_wday = (finalDays + 4) % 7;
   tm.tm_isdst = _isDST(y, mo, d, tm.tm_hour) ? 1 : 0;
-  
+
   return true;
 }
 
@@ -152,7 +164,6 @@ bool STM32RTCplus::_ntpSync(UDP &udp, bool connected, const char* server, int ti
 
   return false;  // Все попытки провалились
 }
-
 
 bool STM32RTCplus::adjustSeconds(int32_t seconds) {
   uint32_t current = (RTC->CNTH << 16) | RTC->CNTL;
