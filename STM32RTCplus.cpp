@@ -42,25 +42,16 @@ bool STM32RTCplus::getTime(struct tm &tm) {
 
   uint32_t refDays = _dateToDays(ry, rmo, rd);
   uint32_t rtcSec = (RTC->CNTH << 16) | RTC->CNTL; // Читаем напрямую
-  uint32_t utcSec = refDays * 86400UL + rtcSec;
+  uint64_t utcSec = (uint64_t)refDays * 86400ULL + rtcSec;
 
   // ... (весь ваш код для часовых поясов, он без изменений) ...
   uint32_t localSec = utcSec;
   uint16_t y = 1970; uint8_t mo = 1, d = 1, h = 0;
   int32_t offset = 0;
 
-  for (int i = 0; i < 3; i++) {
-    uint32_t days = localSec / 86400UL;
-    uint32_t secs = localSec % 86400UL;
-    _daysToDate(days, y, mo, d);
-    h = secs / 3600;
-    offset = _getTimezoneOffset(y, mo, d, h);
-    localSec = utcSec + offset;
-  }
-
-  uint32_t days = localSec / 86400UL;
-  uint32_t secs = localSec % 86400UL;
-  _daysToDate(days, y, mo, d);
+  uint32_t finalDays = localSec / 86400UL;
+  uint32_t finalSecs = localSec % 86400UL;
+  _daysToDate(finalDays, y, mo, d);
 
   tm.tm_year = y - 1900;
   tm.tm_mon  = mo - 1;
@@ -71,9 +62,8 @@ bool STM32RTCplus::getTime(struct tm &tm) {
   tm.tm_wday = (days + 4) % 7;
   // Небольшое исправление для tm_isdst
   int32_t currentOffset = _getTimezoneOffset(y, mo, d, tm.tm_hour);
-  tm.tm_isdst = (currentOffset > offset) ? 1 : 0; 
-  if (offset == 0 && currentOffset == 0) tm.tm_isdst = 0; // Для UTC
-
+  tm.tm_isdst = _isDST(y, mo, d, tm.tm_hour) ? 1 : 0;
+  
   return true;
 }
 
@@ -87,40 +77,82 @@ bool STM32RTCplus::syncNTP(UDP &udp, bool (*isConnected)(), const char* server, 
   return _ntpSync(udp, true, server, timeoutMs);
 }
 
+bool STM32RTCplus::_isDST(uint16_t y, uint8_t m, uint8_t d, uint8_t h) {
+  if (strcmp(_timezone, "EST5EDT") != 0) return false;
+  if (m > 3 && m < 11) return true;
+  if (m < 3 || m > 11) return false;
+  if (m == 3) {
+    uint8_t sun = 8 + ((7 - (_dateToDays(y, 3, 1) + 4) % 7));
+    return (d > sun || (d == sun && h >= 2));
+  }
+  if (m == 11) {
+    uint8_t sun = 1 + ((7 - (_dateToDays(y, 11, 1) + 4) % 7));
+    return (d < sun);
+  }
+  return false;
+}
+
 bool STM32RTCplus::_ntpSync(UDP &udp, bool connected, const char* server, int timeoutMs) {
   const int NTP_PACKET_SIZE = 48;
   byte packet[NTP_PACKET_SIZE] = {0};
 
-  packet[0] = 0b11100011;
-  // ... (остальной код NTP без изменений) ...
+  packet[0] = 0b11100011;   // LI, Version, Mode
+  packet[1] = 0;            // Stratum
+  packet[2] = 6;            // Polling
+  packet[3] = 0xEC;         // Precision
+  packet[12] = 49;
+  packet[13] = 0x4E;
+  packet[14] = 49;
   packet[15] = 52;
 
-  udp.beginPacket(server, 123);
-  udp.write(packet, NTP_PACKET_SIZE);
-  udp.endPacket();
+  const int MAX_RETRIES = 3;
+  const int RETRY_DELAY_MS = 500;
 
-  uint32_t start = millis();
-  while (millis() - start < timeoutMs) {
-    if (udp.parsePacket() >= NTP_PACKET_SIZE) {
-      udp.read(packet, NTP_PACKET_SIZE);
-      uint32_t high = word(packet[40], packet[41]);
-      uint32_t low  = word(packet[42], packet[43]);
-      uint32_t ntpTime = (high << 16) | low;
-      uint32_t epoch = ntpTime - 2208988800UL;
+  for (int retry = 0; retry < MAX_RETRIES; retry++) {
+    udp.beginPacket(server, 123);
+    udp.write(packet, NTP_PACKET_SIZE);
+    udp.endPacket();
 
-      uint32_t days = epoch / 86400UL;
-      uint32_t secs = epoch % 86400UL;
-      uint16_t y; uint8_t mo, d;
-      _daysToDate(days, y, mo, d);
+    uint32_t start = millis();
+    while (millis() - start < timeoutMs) {
+      if (udp.parsePacket() >= NTP_PACKET_SIZE) {
+        udp.read(packet, NTP_PACKET_SIZE);
 
-      return setTime(y, mo, d,
-                     secs / 3600,
-                     (secs % 3600) / 60,
-                     secs % 60);
+        // === ВАЛИДАЦИЯ ПАКЕТА ===
+        byte liVnMode = packet[0];
+        byte vn = (liVnMode & 0b00111000) >> 3;
+        byte mode = liVnMode & 0b00000111;
+        if (vn != 3 && vn != 4) continue;  // NTP v3 или v4
+        if (mode != 4) continue;          // Mode 4 = server
+        if (packet[1] == 0) continue;     // Stratum 0 = ошибка
+
+        // === ЧТЕНИЕ ВРЕМЕНИ ===
+        uint32_t high = word(packet[40], packet[41]);
+        uint32_t low  = word(packet[42], packet[43]);
+        uint32_t ntpTime = (high << 16) | low;
+        uint32_t epoch = ntpTime - 2208988800UL;
+
+        uint32_t days = epoch / 86400UL;
+        uint32_t secs = epoch % 86400UL;
+        uint16_t y; uint8_t mo, d;
+        _daysToDate(days, y, mo, d);
+
+        return setTime(y, mo, d,
+                       secs / 3600,
+                       (secs % 3600) / 60,
+                       secs % 60);
+      }
+    }
+
+    // Если не получили ответ — ждём перед следующей попыткой
+    if (retry < MAX_RETRIES - 1) {
+      delay(RETRY_DELAY_MS);
     }
   }
-  return false;
+
+  return false;  // Все попытки провалились
 }
+
 
 bool STM32RTCplus::adjustSeconds(int32_t seconds) {
   uint32_t current = (RTC->CNTH << 16) | RTC->CNTL;
