@@ -52,7 +52,7 @@ bool STM32RTCplus::getTime(struct tm &tm) {
   uint16_t y = 1970; uint8_t mo = 1, d = 1, h = 0;
   int32_t offset = 0;
 
-  // 3 итерации для стабилизации DST
+  // --- 3 итерации для стабилизации DST
   for (int i = 0; i < 3; i++) {
     uint64_t days = localSec / 86400ULL;
     uint32_t secs = localSec % 86400ULL;
