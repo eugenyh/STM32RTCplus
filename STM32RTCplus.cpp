@@ -17,9 +17,9 @@ bool STM32RTCplus::isFirstBoot() {
 bool STM32RTCplus::setTime(uint16_t y, uint8_t mo, uint8_t d,
                            uint8_t h, uint8_t mi, uint8_t s) {
   if (y < 1970 || mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+  RTC->CNTH = 0;
+  RTC->CNTL = 0;  // сбрасываем счётчик
   _writeRefDate(y, mo, d);
-  uint32_t daySec = h * 3600UL + mi * 60UL + s;
-  _rtc.setSeconds(daySec);
   return true;
 }
 
@@ -28,7 +28,7 @@ bool STM32RTCplus::getTime(struct tm &tm) {
   if (!_readRefDate(ry, rmo, rd)) return false;
 
   uint32_t refDays = _dateToDays(ry, rmo, rd);
-  uint32_t rtcSec = _rtc.getSeconds();
+  uint32_t rtcSec = (RTC->CNTH << 16) | RTC->CNTL;
   uint32_t utcSec = refDays * 86400UL + rtcSec;
 
   uint32_t localSec = utcSec;
@@ -112,25 +112,16 @@ bool STM32RTCplus::_ntpSync(UDP &udp, bool connected, const char* server, int ti
 
 // === Коррекция времени ===
 bool STM32RTCplus::adjustSeconds(int32_t seconds) {
-  // Читаем текущее значение RTC-счётчика
-  uint32_t current = _rtc.getSeconds();
-
-  // Применяем поправку
+  uint32_t current = (RTC->CNTH << 16) | RTC->CNTL;
   int64_t newSec = (int64_t)current + seconds;
-
-  // Защита от переполнения
-  if (newSec < 0) {
-    newSec = 0;
-  }
-  if (newSec > 0xFFFFFFFFUL) {
-    newSec = 0xFFFFFFFFUL;
-  }
-
-  // Записываем обратно в RTC — БЕЗ BKP!
-  _rtc.setSeconds((uint32_t)newSec);
-
+  if (newSec < 0) newSec = 0;
+  if (newSec > 0xFFFFFFFFUL) newSec = 0xFFFFFFFFUL;
+  
+  RTC->CNTH = newSec >> 16;
+  RTC->CNTL = newSec & 0xFFFF;
   return true;
 }
+
 
 // === Вспомогательные функции (без изменений) ===
 uint32_t STM32RTCplus::_dateToDays(uint16_t y, uint8_t m, uint8_t d) {
